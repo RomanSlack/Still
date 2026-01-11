@@ -2,9 +2,8 @@
 
 import { useState, useRef, useCallback } from "react";
 import { Upload, X, CheckCircle, Loader2, AlertCircle } from "lucide-react";
-import { uploadVideo, cancelUpload, UploadProgress } from "@/lib/firebase";
+import { uploadVideo, cancelUpload, UploadProgress, UploadTask } from "@/lib/firebase";
 import { createVideo, processVideo } from "@/lib/api";
-import type { UploadTask } from "firebase/storage";
 
 interface UploadFormProps {
   onUploadComplete?: () => void;

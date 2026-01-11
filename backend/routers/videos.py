@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status, BackgroundTasks
 from fastapi.responses import StreamingResponse
 
 from models.video import Video, VideoCreate, VideoUpdate, VideoList, VideoStatus, ProcessingResult, VideoSummaryItem
-from services.firebase_client import VideoRepository, get_signed_url, download_video_to_temp, upload_video_to_storage
+from services.firebase_client import VideoRepository, get_signed_url, download_video_to_temp, upload_video_to_storage, generate_upload_signed_url
 from services.transcription import transcribe_video, needs_transcode, transcode_to_h264
 from services.ai_tagger import generate_title_and_tags_safe
 from services.progress import (
@@ -191,6 +191,37 @@ async def get_video(video_id: str):
         pass
 
     return video
+
+
+@router.post("/upload-url")
+async def get_upload_url(filename: str):
+    """Generate a signed URL for uploading a video to Firebase Storage."""
+    import uuid
+    from datetime import datetime
+
+    # Generate unique storage path
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_id = str(uuid.uuid4())[:8]
+    ext = filename.split(".")[-1] if "." in filename else "mp4"
+    storage_path = f"videos/{timestamp}_{unique_id}.{ext}"
+
+    # Determine content type
+    content_type = "video/mp4"
+    if ext.lower() == "mov":
+        content_type = "video/quicktime"
+    elif ext.lower() == "webm":
+        content_type = "video/webm"
+
+    # Generate signed upload URL (run in thread)
+    upload_url = await asyncio.to_thread(
+        generate_upload_signed_url, storage_path, content_type
+    )
+
+    return {
+        "upload_url": upload_url,
+        "storage_path": storage_path,
+        "content_type": content_type,
+    }
 
 
 @router.post("", response_model=Video, status_code=status.HTTP_201_CREATED)

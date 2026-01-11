@@ -219,3 +219,19 @@ def upload_video_to_storage(local_path: str, storage_path: str) -> None:
     bucket = get_storage_bucket()
     blob = bucket.blob(storage_path)
     blob.upload_from_filename(local_path, content_type="video/mp4")
+
+
+def generate_upload_signed_url(storage_path: str, content_type: str = "video/mp4", expiration_minutes: int = 30) -> str:
+    """Generate a signed URL for uploading a video to Firebase Storage."""
+    from datetime import timedelta
+
+    bucket = get_storage_bucket()
+    blob = bucket.blob(storage_path)
+
+    url = blob.generate_signed_url(
+        version="v4",
+        expiration=timedelta(minutes=expiration_minutes),
+        method="PUT",
+        content_type=content_type,
+    )
+    return url

@@ -1,17 +1,4 @@
-import { initializeApp, getApps } from "firebase/app";
-import { getStorage, ref, uploadBytesResumable, UploadTask } from "firebase/storage";
-
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const storage = getStorage(app);
+import { getUploadUrl } from "./api";
 
 export interface UploadProgress {
   progress: number;
@@ -24,39 +11,78 @@ export interface UploadResult {
   filename: string;
 }
 
+// Custom upload task that mimics Firebase UploadTask interface
+export interface UploadTask {
+  cancel: () => boolean;
+}
+
 export function uploadVideo(
   file: File,
   onProgress?: (progress: UploadProgress) => void
 ): { task: UploadTask; promise: Promise<UploadResult> } {
-  // Generate unique filename
-  const timestamp = Date.now();
-  const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-  const storagePath = `videos/${timestamp}_${sanitizedName}`;
+  let xhr: XMLHttpRequest | null = null;
+  let cancelled = false;
 
-  const storageRef = ref(storage, storagePath);
-  const task = uploadBytesResumable(storageRef, file);
-
-  const promise = new Promise<UploadResult>((resolve, reject) => {
-    task.on(
-      "state_changed",
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress?.({
-          progress,
-          bytesTransferred: snapshot.bytesTransferred,
-          totalBytes: snapshot.totalBytes,
-        });
-      },
-      (error) => {
-        reject(error);
-      },
-      () => {
-        resolve({
-          storagePath,
-          filename: file.name,
-        });
+  const task: UploadTask = {
+    cancel: () => {
+      if (xhr) {
+        cancelled = true;
+        xhr.abort();
+        return true;
       }
-    );
+      return false;
+    },
+  };
+
+  const promise = new Promise<UploadResult>(async (resolve, reject) => {
+    try {
+      // Get signed upload URL from backend
+      const { upload_url, storage_path, content_type } = await getUploadUrl(file.name);
+
+      if (cancelled) {
+        reject(new Error("Upload cancelled"));
+        return;
+      }
+
+      // Upload using XMLHttpRequest for progress tracking
+      xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const progress = (event.loaded / event.total) * 100;
+          onProgress?.({
+            progress,
+            bytesTransferred: event.loaded,
+            totalBytes: event.total,
+          });
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr!.status >= 200 && xhr!.status < 300) {
+          resolve({
+            storagePath: storage_path,
+            filename: file.name,
+          });
+        } else {
+          reject(new Error(`Upload failed with status ${xhr!.status}`));
+        }
+      });
+
+      xhr.addEventListener("error", () => {
+        reject(new Error("Upload failed"));
+      });
+
+      xhr.addEventListener("abort", () => {
+        reject(new Error("Upload cancelled"));
+      });
+
+      xhr.open("PUT", upload_url);
+      xhr.setRequestHeader("Content-Type", content_type);
+      xhr.send(file);
+    } catch (error) {
+      reject(error);
+    }
   });
 
   return { task, promise };
@@ -65,5 +91,3 @@ export function uploadVideo(
 export function cancelUpload(task: UploadTask): boolean {
   return task.cancel();
 }
-
-export { storage };

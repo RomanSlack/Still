@@ -137,3 +137,19 @@ export async function getTags(): Promise<string[]> {
   const data = await response.json();
   return data.tags;
 }
+
+export async function getUploadUrl(filename: string): Promise<{
+  upload_url: string;
+  storage_path: string;
+  content_type: string;
+}> {
+  const response = await fetchWithAuth(`/videos/upload-url?filename=${encodeURIComponent(filename)}`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get upload URL");
+  }
+
+  return response.json();
+}

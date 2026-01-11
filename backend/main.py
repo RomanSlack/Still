@@ -55,6 +55,10 @@ async def auth_middleware(request: Request, call_next):
     if request.url.path in public_paths:
         return await call_next(request)
 
+    # Skip auth for SSE progress endpoints (EventSource doesn't support headers)
+    if request.url.path.endswith("/progress"):
+        return await call_next(request)
+
     # Check for auth header
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):

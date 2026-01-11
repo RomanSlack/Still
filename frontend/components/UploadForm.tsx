@@ -197,21 +197,22 @@ export default function UploadForm({ onUploadComplete }: UploadFormProps) {
         <div className="border border-[var(--border)] rounded-xl p-4 text-center">
           <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin text-[var(--muted)]" />
           <p className="text-sm font-medium">
-            {state === "creating" ? "Creating record..." : "Starting AI processing..."}
+            {state === "creating" ? "Saving video..." : "Starting AI processing..."}
           </p>
-          <p className="text-xs text-[var(--muted)] mt-1">
-            This may take a few minutes
-          </p>
+          <p className="text-xs text-[var(--muted)] mt-1">Almost done...</p>
         </div>
       )}
 
       {/* Complete */}
       {state === "complete" && (
-        <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-center">
-          <CheckCircle className="w-6 h-6 mx-auto mb-2 text-green-600" />
-          <p className="text-sm font-medium text-green-800">Upload complete!</p>
+        <div className="border border-green-200 bg-green-50 rounded-xl p-6 text-center">
+          <CheckCircle className="w-8 h-8 mx-auto mb-3 text-green-600" />
+          <p className="text-base font-medium text-green-800">Upload complete!</p>
+          <p className="text-sm text-green-700 mt-2">
+            AI processing is running in the background.
+          </p>
           <p className="text-xs text-green-600 mt-1">
-            AI processing has started
+            You can close this page - your video will be ready when you return.
           </p>
         </div>
       )}

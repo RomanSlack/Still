@@ -1,4 +1,5 @@
 import os
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 import firebase_admin
@@ -55,6 +56,7 @@ class VideoRepository:
             title=data.get("title"),
             tags=data.get("tags", []),
             transcript=data.get("transcript"),
+            summary=data.get("summary"),
             duration=data.get("duration"),
             status=VideoStatus(data.get("status", "pending")),
             created_at=data.get("created_at", datetime.now(timezone.utc)),
@@ -75,7 +77,8 @@ class VideoRepository:
             "processed_at": None,
         }
 
-        doc_ref.set(data)
+        # Run blocking Firestore operation in thread pool
+        await asyncio.to_thread(doc_ref.set, data)
 
         return Video(
             id=doc_ref.id,
@@ -88,7 +91,8 @@ class VideoRepository:
         )
 
     async def get(self, video_id: str) -> Optional[Video]:
-        doc = self.collection.document(video_id).get()
+        # Run blocking Firestore operation in thread pool
+        doc = await asyncio.to_thread(self.collection.document(video_id).get)
         if not doc.exists:
             return None
         return self._doc_to_video(doc)
@@ -108,13 +112,17 @@ class VideoRepository:
             query = query.where(filter=FieldFilter("tags", "array_contains", tag_filter))
 
         query = query.limit(limit)
-        docs = query.stream()
+
+        # Run blocking Firestore operation in thread pool
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
 
         return [self._doc_to_video(doc) for doc in docs]
 
     async def update(self, video_id: str, update: VideoUpdate) -> Optional[Video]:
         doc_ref = self.collection.document(video_id)
-        doc = doc_ref.get()
+
+        # Run blocking Firestore operation in thread pool
+        doc = await asyncio.to_thread(doc_ref.get)
 
         if not doc.exists:
             return None
@@ -126,19 +134,24 @@ class VideoRepository:
             update_data["tags"] = update.tags
         if update.transcript is not None:
             update_data["transcript"] = update.transcript
+        if update.summary is not None:
+            update_data["summary"] = update.summary
         if update.status is not None:
             update_data["status"] = update.status.value
             if update.status == VideoStatus.READY:
                 update_data["processed_at"] = datetime.now(timezone.utc)
 
         if update_data:
-            doc_ref.update(update_data)
+            # Run blocking Firestore operation in thread pool
+            await asyncio.to_thread(doc_ref.update, update_data)
 
         return await self.get(video_id)
 
     async def delete(self, video_id: str) -> bool:
         doc_ref = self.collection.document(video_id)
-        doc = doc_ref.get()
+
+        # Run blocking Firestore operation in thread pool
+        doc = await asyncio.to_thread(doc_ref.get)
 
         if not doc.exists:
             return False
@@ -150,16 +163,19 @@ class VideoRepository:
             try:
                 bucket = get_storage_bucket()
                 blob = bucket.blob(storage_path)
-                blob.delete()
+                # Run blocking storage operation in thread pool
+                await asyncio.to_thread(blob.delete)
             except Exception:
                 pass  # Continue even if storage deletion fails
 
-        doc_ref.delete()
+        # Run blocking Firestore operation in thread pool
+        await asyncio.to_thread(doc_ref.delete)
         return True
 
     async def get_all_tags(self) -> list[str]:
         """Get all unique tags across all videos."""
-        docs = self.collection.stream()
+        # Run blocking Firestore operation in thread pool
+        docs = await asyncio.to_thread(lambda: list(self.collection.stream()))
         tags = set()
         for doc in docs:
             data = doc.to_dict()
@@ -196,3 +212,10 @@ def download_video_to_temp(storage_path: str) -> str:
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
         blob.download_to_filename(tmp.name)
         return tmp.name
+
+
+def upload_video_to_storage(local_path: str, storage_path: str) -> None:
+    """Upload a video file to Firebase Storage."""
+    bucket = get_storage_bucket()
+    blob = bucket.blob(storage_path)
+    blob.upload_from_filename(local_path, content_type="video/mp4")

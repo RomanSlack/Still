@@ -38,8 +38,8 @@ export default function VideoGrid({ videos, loading }: VideoGridProps) {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-      {videos.map((video) => (
-        <VideoCard key={video.id} video={video} />
+      {videos.map((video, index) => (
+        <VideoCard key={video.id} video={video} index={index} />
       ))}
     </div>
   );

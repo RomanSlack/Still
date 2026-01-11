@@ -21,6 +21,7 @@ class VideoUpdate(BaseModel):
     title: Optional[str] = None
     tags: Optional[list[str]] = None
     transcript: Optional[str] = None
+    summary: Optional[str] = None
     status: Optional[VideoStatus] = None
 
 
@@ -32,6 +33,7 @@ class Video(BaseModel):
     title: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     transcript: Optional[str] = None
+    summary: Optional[str] = None
     duration: Optional[float] = None
     status: VideoStatus = VideoStatus.PENDING
     created_at: datetime
@@ -41,8 +43,22 @@ class Video(BaseModel):
         from_attributes = True
 
 
+class VideoSummaryItem(BaseModel):
+    """Lightweight video model for list views (no transcript)."""
+    id: str
+    filename: str
+    storage_path: str
+    storage_url: Optional[str] = None
+    title: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+    summary: Optional[str] = None
+    duration: Optional[float] = None
+    status: VideoStatus = VideoStatus.PENDING
+    created_at: datetime
+
+
 class VideoList(BaseModel):
-    videos: list[Video]
+    videos: list[VideoSummaryItem]
     total: int
 
 
@@ -51,4 +67,5 @@ class ProcessingResult(BaseModel):
     title: str
     tags: list[str]
     transcript: str
+    summary: str
     status: VideoStatus

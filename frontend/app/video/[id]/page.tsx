@@ -7,6 +7,7 @@ import { ArrowLeft, Trash2, Loader2, Calendar, Clock, RefreshCw } from "lucide-r
 import { isAuthenticated } from "@/lib/auth";
 import { getVideo, deleteVideo, processVideo, Video } from "@/lib/api";
 import VideoPlayer from "@/components/VideoPlayer";
+import ConfirmModal from "@/components/ConfirmModal";
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -34,6 +35,7 @@ export default function VideoPage() {
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,8 +77,6 @@ export default function VideoPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this video?")) return;
-
     setDeleting(true);
     try {
       await deleteVideo(videoId);
@@ -84,6 +84,7 @@ export default function VideoPage() {
     } catch (err) {
       setError("Failed to delete video");
       setDeleting(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -140,16 +141,12 @@ export default function VideoPage() {
           </div>
 
           <button
-            onClick={handleDelete}
+            onClick={() => setShowDeleteModal(true)}
             disabled={deleting}
-            className="p-2 text-[var(--muted)] hover:text-red-500 disabled:opacity-50"
+            className="p-2 text-[var(--muted)] hover:text-red-500 disabled:opacity-50 transition-colors"
             title="Delete video"
           >
-            {deleting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Trash2 className="w-4 h-4" />
-            )}
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </header>
@@ -222,13 +219,14 @@ export default function VideoPage() {
 
             {/* Tags */}
             {video.tags.length > 0 && (
-              <div>
+              <div className="animate-fade-in">
                 <h3 className="text-sm font-medium text-[var(--muted)] mb-2">Tags</h3>
                 <div className="flex flex-wrap gap-2">
-                  {video.tags.map((tag) => (
+                  {video.tags.map((tag, index) => (
                     <span
                       key={tag}
-                      className="text-sm px-3 py-1 rounded-full bg-[var(--card)] border border-[var(--border)]"
+                      className="text-sm px-3 py-1 rounded-full bg-[var(--card)] border border-[var(--border)] hover:border-[var(--muted)] transition-colors"
+                      style={{ animationDelay: `${index * 50}ms` }}
                     >
                       {tag}
                     </span>
@@ -237,22 +235,58 @@ export default function VideoPage() {
               </div>
             )}
 
+            {/* Summary */}
+            {video.summary && (
+              <div className="animate-fade-in">
+                <h3 className="text-sm font-medium text-[var(--muted)] mb-2">Summary</h3>
+                <div className="p-4 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/20">
+                  <p className="text-sm leading-relaxed text-[var(--foreground)]">
+                    {video.summary}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Transcript */}
             {video.transcript && (
-              <div>
+              <div className="animate-fade-in">
                 <h3 className="text-sm font-medium text-[var(--muted)] mb-2">
                   Transcript
                 </h3>
                 <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--border)] max-h-96 overflow-y-auto">
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--muted-foreground)]">
                     {video.transcript}
                   </p>
                 </div>
               </div>
             )}
+
+            {/* Delete button (mobile) */}
+            <div className="pt-4 border-t border-[var(--border)] lg:hidden">
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                disabled={deleting}
+                className="w-full py-3 px-4 rounded-xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                Delete Entry
+              </button>
+            </div>
           </div>
         </div>
       </main>
+
+      {/* Delete confirmation modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Delete Entry"
+        message="Are you sure you want to delete this journal entry? This action cannot be undone and the video will be permanently removed."
+        confirmText="Delete"
+        cancelText="Keep Entry"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   );
 }
